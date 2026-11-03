@@ -330,6 +330,11 @@ func (MemoryItem) TableName() string { return "memory_items" }
 // tenants. It is deliberately small: everything a workspace admin can decide
 // fits in four fields.
 type MemoryConfig struct {
+	// HostInferenceOnly disables service-owned model calls. The host supplies
+	// metered extraction outputs and vectors through the standalone API.
+	HostInferenceOnly       bool `json:"host_inference_only"`
+	HostEmbeddingDimensions int  `json:"host_embedding_dimensions"`
+
 	// Enabled defaults to false. Memory retains user statements across
 	// sessions, so a workspace admin has to turn it on deliberately.
 	Enabled bool `json:"enabled"`

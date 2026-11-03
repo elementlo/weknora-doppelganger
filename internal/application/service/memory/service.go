@@ -885,6 +885,16 @@ func (s *Service) Clear(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if s.workspaceConfig(ctx, scope.TenantID).HostInferenceOnly {
+		// Host proposals live outside native extraction cursors. Clear must
+		// atomically advance the subject generation even for an empty store.
+		if _, err := s.repo.EnsureSubject(ctx, scope); err != nil {
+			return 0, err
+		}
+		s.tombstoneEverything(ctx, scope)
+		scope.PreserveTombstones = true
+		return s.repo.ClearSubjectMemory(ctx, scope)
+	}
 	scope, err = s.captureGeneration(ctx, scope)
 	if err != nil {
 		return 0, err

@@ -15,6 +15,13 @@ func RegisterMemoryRoutes(r *gin.RouterGroup, memoryHandler *handler.MemoryHandl
 	memoryGroup := g.apiKeyGroup(r.Group("/memory", g.Viewer()), apiKeyFullAccess())
 	{
 		memoryGroup.POST("/search", memoryHandler.SearchMemory)
+		memoryGroup.POST("/vectors/prepare", memoryHandler.PrepareMemoryVectors)
+		memoryGroup.POST("/vectors/commit", memoryHandler.CommitMemoryVector)
+		memoryGroup.POST("/search/vector", memoryHandler.SearchMemoryVector)
+		memoryGroup.POST("/extractions/prepare", memoryHandler.PrepareExtraction)
+		memoryGroup.POST("/extractions/resolve", memoryHandler.ResolveExtraction)
+		memoryGroup.POST("/experiences/prepare", memoryHandler.PrepareExperience)
+		memoryGroup.POST("/experiences/resolve", memoryHandler.ResolveExperience)
 		memoryGroup.POST("/extractions/preview", memoryHandler.ExtractExternal)
 		memoryGroup.POST("/experiences/preview", memoryHandler.DistillExternal)
 		memoryGroup.GET("/settings", memoryHandler.GetSettings)

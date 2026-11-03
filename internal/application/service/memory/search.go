@@ -136,5 +136,5 @@ func (s *Service) SearchMemory(
 		"tenant_id": scope.TenantID,
 	}, nil)
 
-	return interfaces.MemorySearchResult{Available: true, Items: matched}
+	return interfaces.MemorySearchResult{Available: true, Items: matched, RankingMode: rankTrace.Mode, VectorHits: rankTrace.VectorHits, VectorSkipReason: rankTrace.VectorSkipReason}
 }

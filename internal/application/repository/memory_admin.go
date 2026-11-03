@@ -114,6 +114,9 @@ func (r *memoryRepository) ClearSubjectMemory(ctx context.Context, scope interfa
 			&types.MemoryItemEmbedding{}, &types.MemoryTopicStat{},
 			&types.MemoryDocAffinity{}, &types.MemoryTombstone{},
 		} {
+			if _, tombstone := model.(*types.MemoryTombstone); tombstone && scope.PreserveTombstones {
+				continue
+			}
 			if err := tx.Where("tenant_id = ? AND subject_id = ?", scope.TenantID, scope.SubjectID).
 				Delete(model).Error; err != nil {
 				return err

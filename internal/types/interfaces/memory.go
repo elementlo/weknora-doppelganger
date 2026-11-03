@@ -15,6 +15,8 @@ import (
 type MemoryScope struct {
 	TenantID  uint64
 	SubjectID string
+	// PreserveTombstones distinguishes user-forget from administrative purge.
+	PreserveTombstones bool
 	// Generation fences results computed before a clear. nil is an unguarded
 	// operation; a pointer to "" captures the initial, pre-clear generation.
 	Generation *string
@@ -266,6 +268,10 @@ type MemoryRecall struct {
 // different answers, and collapsing both into an empty slice would have the
 // agent report a blank memory store to someone who simply disabled it.
 type MemorySearchResult struct {
+	RankingMode      string
+	VectorHits       int
+	VectorSkipReason string
+
 	// Available is false when memory is off at any level — workspace, user or
 	// the agent handling this request.
 	Available bool

@@ -22,6 +22,14 @@ Verification: go test ./internal/handler ./internal/router ./internal/applicatio
 
 ## Persistent local application setup
 
+### Host-owned inference (M03.7)
+
+The fork adds extraction/experience `prepare` and `resolve` endpoints. Prepare reuses the memory prompt builder without calling chat or embedding models; resolve reuses the candidate parser. Two-minute process-key HMAC tickets bind authenticated tenant/subject, source content/revision, operation kind and clear generation. Restart invalidates tickets. Existing context is a disclosed importance prefix when it exceeds the bounded extraction window.
+
+`POST /memory/vectors/prepare` returns up to 20 missing-vector texts with scoped content/version tickets; `/vectors/commit` validates ticket, active item, model and configured dimension before storage. `/memory/search/vector` accepts a host-computed query embedding and uses the existing lexical/vector fusion. It returns actual ranking mode, vector hits and skip reason. `host_inference_only` disables service-owned extraction, topic model selection and embedding calls; the workspace pins `host_embedding_dimensions`. User clear advances generation even on an empty subject and retains forget tombstones.
+
+Harness owns gateway credentials, every chat/embedding dispatch, root accounting, truncation retries, shared capacity, deadlines and cancellation. This service owns no second Agent loop or inference pool. In the persistent dedicated instance, real Harness CLI extraction and experience each produced one source-linked candidate; embedding indexed two synthetic notes, and the final search reported hybrid mode with two vector hits. A farther colloquial paraphrase returned no matches, so this is connectivity/lifecycle evidence, not general retrieval-quality acceptance. Related Go memory/repository/handler/router tests and Lite build pass; PostgreSQL-only skipped tests are not live PostgreSQL acceptance.
+
 The fork now has a persistent local deployment for Ddoppelganger Next. `scripts/doppelganger-service.sh` starts the Lite binary with an empty inherited environment and a private `.runtime/.env.lite`. It owns `127.0.0.1:18081`; the old WeKnora service on `127.0.0.1:8080` is a separate application and is not stopped or reused.
 
 The current database is `/Users/element/workspace/ai/weknora-doppelganger/data/weknora.db` (SQLite WAL), local attachments are under `data/files/`, and service logs are under `logs/`. The private account and connection material are under `.runtime/` and are ignored by Git. On 2026-11-03 the persistent instance was migrated to schema 52, a real local account was registered, memory configuration was enabled, one memory item was written and read back, and login plus memory readback remained valid after a service restart. This proves persistence and identity wiring only; it does not prove embedding, automatic extraction, experience distillation, or semantic quality.

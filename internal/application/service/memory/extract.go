@@ -821,6 +821,9 @@ func buildExtractionPrompt(
 func (s *Service) extractionModelID(
 	ctx context.Context, cfg *types.MemoryConfig, payload types.MemoryExtractPayload,
 ) string {
+	if cfg != nil && cfg.HostInferenceOnly {
+		return ""
+	}
 	if cfg != nil && cfg.ExtractModelID != "" {
 		return cfg.ExtractModelID
 	}
@@ -924,6 +927,9 @@ func (s *Service) callExtractionModel(
 	forgotten []*types.MemoryTombstone,
 	knownTopics []*types.MemoryTopicStat,
 ) (extractionResponse, error) {
+	if cfg.HostInferenceOnly {
+		return extractionResponse{}, fmt.Errorf("inference belongs to host")
+	}
 	modelID := s.extractionModelID(ctx, cfg, payload)
 	if modelID == "" {
 		// Returning an error keeps the watermark where it is. Skipping here

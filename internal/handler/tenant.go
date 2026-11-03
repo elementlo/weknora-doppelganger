@@ -1847,6 +1847,10 @@ func (h *TenantHandler) updateTenantMemoryConfigInternal(c *gin.Context) {
 			types.MaxMemoryExtractMinIntervalSeconds)))
 		return
 	}
+	if cfg.HostEmbeddingDimensions < 0 || cfg.HostEmbeddingDimensions > 4096 {
+		c.Error(errors.NewBadRequestError("host embedding dimensions out of range"))
+		return
+	}
 	if len(cfg.EmbeddingModelID) > 64 {
 		c.Error(errors.NewBadRequestError("embedding_model_id is too long"))
 		return

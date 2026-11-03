@@ -19,7 +19,7 @@ var externalHash = regexp.MustCompile(`^[a-f0-9]{64}$`)
 // This prevents late/uncertain HTTP results from changing stable memory.
 func (s *Service) ProposeExternal(ctx context.Context, request types.ExternalMemoryInput, experience bool) (*types.ExternalMemoryResult, error) {
 	scope, cfg, ok := s.enabledScope(ctx)
-	if !ok {
+	if !ok || cfg.HostInferenceOnly {
 		return nil, fmt.Errorf("external memory disabled")
 	}
 	if len(request.Sources) < 1 || len(request.Sources) > 20 {

@@ -57,7 +57,12 @@ const (
 // own embedding model, so there is no "the workspace embedding model" to fall
 // back to — picking the first listed one would silently mix incomparable
 // spaces as models are added or deleted. Blank means semantic recall is off.
-func (s *Service) embedder(_ context.Context, cfg *types.MemoryConfig) (string, bool) {
+func (s *Service) embedder(ctx context.Context, cfg *types.MemoryConfig) (string, bool) {
+	if cfg != nil && cfg.HostInferenceOnly {
+		if _, external := ctx.Value(externalVectorKey{}).(externalQueryVector); !external {
+			return "", false
+		}
+	}
 	if cfg == nil || !cfg.VectorRecallEnabled() || s.modelService == nil {
 		return "", false
 	}
@@ -209,7 +214,15 @@ func (s *Service) vectorSearch(
 	if !ok {
 		return nil, "vector_disabled"
 	}
-	queryVector := s.embedText(types.WithEmbedQuery(ctx), modelID, query, embedTimeout)
+	var queryVector []float32
+	if external, exists := ctx.Value(externalVectorKey{}).(externalQueryVector); exists {
+		if external.model != modelID {
+			return nil, "vector_model_mismatch"
+		}
+		queryVector = external.vector
+	} else {
+		queryVector = s.embedText(types.WithEmbedQuery(ctx), modelID, query, embedTimeout)
+	}
 	if len(queryVector) == 0 {
 		return nil, "embed_failed"
 	}
