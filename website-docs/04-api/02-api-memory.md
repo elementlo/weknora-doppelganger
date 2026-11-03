@@ -134,3 +134,7 @@ curl -X PUT "$BASE/api/v1/admin/memory/subjects/$SUBJECT_UUID/settings" \
 清空在同一主体事务中删除记忆及派生资料、切换写入代次，并将提取历史水位推进到清空时刻。已经开始的记忆提取、整理和画像重建不能以旧代次写回；同一会话后续的新消息也不会重新提取清空前的历史，或将这些历史作为提取模型的前文。已有较新的游标保持单调前进。
 
 清空保留身份及其 enabled 设置，不删除聊天消息，也不撤回已经发送给模型或客户端的内容。清空后开始的新记忆操作仍可正常写入；需要持续停止自动提取时，先将该身份 enabled 设为 false，再执行清空。渠道或智能体级提取策略继承不在这些接口的范围内。
+
+## 本 fork 的独立 Harness 接口
+
+本 fork 新增 `/memory/search`、`/memory/extractions/preview` 和 `/memory/experiences/preview`。前者复用已认证主体的记忆检索引擎；后两者只返回带来源版本的候选，不直接修改稳定记忆。接口、长度限制、认证与未完成的预算/异步任务边界见 [Harness 接入说明](../../docs/integrations/harness-memory-api.md)。
