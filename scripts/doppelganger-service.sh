@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 RUNTIME_DIR="$ROOT_DIR/.runtime"
 ENV_FILE="$RUNTIME_DIR/.env.lite"
 BIN="$ROOT_DIR/build/weknora-doppelganger"
@@ -23,12 +24,15 @@ owned_pid() {
   kill -0 "$pid" 2>/dev/null || return 1
   local command
   command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-  [[ "$command" == *"$BIN"* ]] || fail "refusing to operate on non-WeKnora PID $pid"
+  [[ "$command" == "$BIN" ]] || { echo "error: refusing to operate on non-WeKnora PID $pid" >&2; return 2; }
   echo "$pid"
 }
 start() {
   require_runtime
-  if pid="$(owned_pid 2>/dev/null)"; then echo "already running pid=$pid url=$BASE_URL"; return; fi
+  local pid ownership=0
+  pid="$(owned_pid)" || ownership=$?
+  [[ "$ownership" != 2 ]] || return 1
+  if [[ "$ownership" == 0 ]]; then echo "already running pid=$pid url=$BASE_URL"; return; fi
   rm -f "$PID_FILE"
   mkdir -p "$ROOT_DIR/logs" "$ROOT_DIR/data/files"
   chmod 700 "$ROOT_DIR/logs" "$ROOT_DIR/data" "$ROOT_DIR/data/files"
@@ -52,8 +56,10 @@ PYLAUNCH
   echo "started pid=$(cat "$PID_FILE") url=$BASE_URL"
 }
 stop() {
-  local pid
-  pid="$(owned_pid 2>/dev/null)" || { rm -f "$PID_FILE"; echo "not running"; return; }
+  local pid ownership=0
+  pid="$(owned_pid)" || ownership=$?
+  [[ "$ownership" != 2 ]] || return 1
+  if [[ "$ownership" != 0 ]]; then rm -f "$PID_FILE"; echo "not running"; return; fi
   kill -TERM "$pid"
   for _ in {1..30}; do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
   if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid"; fi
@@ -61,9 +67,12 @@ stop() {
   echo "stopped pid=$pid"
 }
 status() {
-  if pid="$(owned_pid 2>/dev/null)"; then
+  local pid ownership=0
+  pid="$(owned_pid)" || ownership=$?
+  [[ "$ownership" != 2 ]] || return 1
+  if [[ "$ownership" == 0 ]]; then
     echo "running pid=$pid url=$BASE_URL"
-    curl -fsS "$BASE_URL/health" 2>/dev/null || true
+    curl --max-time 5 -fsS "$BASE_URL/health" || return 1
     echo
   else
     echo "stopped"
@@ -73,7 +82,7 @@ status() {
 case "${1:-}" in
   start) start ;;
   stop) stop ;;
-  restart) stop || true; start ;;
+  restart) stop; start ;;
   status) status ;;
   *) echo "usage: $0 {start|stop|restart|status}" >&2; exit 2 ;;
 esac
