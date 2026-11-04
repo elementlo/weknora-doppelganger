@@ -35,3 +35,15 @@ The fork now has a persistent local deployment for Ddoppelganger Next. `scripts/
 The current database is `/Users/element/workspace/ai/weknora-doppelganger/data/weknora.db` (SQLite WAL), local attachments are under `data/files/`, and service logs are under `logs/`. The private account and connection material are under `.runtime/` and are ignored by Git. On 2026-11-03 the persistent instance was migrated to schema 52, a real local account was registered, memory configuration was enabled, one memory item was written and read back, and login plus memory readback remained valid after a service restart. This proves persistence and identity wiring only; it does not prove embedding, automatic extraction, experience distillation, or semantic quality.
 
 On 2026-11-03 the service script was hardened to set the repository working directory before launch, keeping relative SQLite/file paths stable even when invoked elsewhere. PID ownership mismatches fail without discarding the PID file or restarting, restart propagates stop failures, and health failures now produce a nonzero status with a five-second request timeout. `bash -n` passed; calling start/status by absolute path from `/private/tmp` recognized the existing process and returned `{"status":"ok"}` without starting a duplicate. No old service or model was touched.
+
+## 审批发布与持久回执（M03.8）
+
+宿主先保存 Evidence、精确候选预览及本人审批，再通过专用 create-only API 发布：
+
+- `GET /memory/publications/context`：当前主体清除 generation；审批冻结此值。
+- `POST /memory/publications`：`key`、`payload_hash`（64 位小写 hex）、`generation`、`kind/content/importance/expires_at`。只在 host_inference_only 开启时允许；显式到期，最多一年。服务拒绝敏感内容改写、过长/非规范正文、重复现存语句、墓碑及容量溢出。没有隐式替代或自动归档。
+- `GET /memory/publications/:key`：`state=absent|active|unavailable`，以及 `receipt` 和当前 `item`。身份从已认证 principal 派生，不接受 tenant/subject body 字段。关闭记忆仍可对账历史 receipt，条目不返回可用态。
+
+SQLite 53 / PostgreSQL 137 新增 `memory_publications`。subject 事务同时创建记忆及 receipt，锁定 subject 并复核清除代次；相同 key 只允许完全相同请求。receipt 只保留 key/hash/item ID/时间，不保存候选正文，用户删除/clear 后仍保留，旧请求不能复活内容。每主体上限 10,000，不清理幂等收据腾位置。derived resident block 在事务后重建，失败不否认已提交事实；此接口不触发模型或自动 embedding。
+
+POST 失败可能已提交，宿主只 GET 对账；absent 不证明在途请求永不会提交。receipt 证明历史提交，不能证明当前条目仍可用，宿主还要核对 payload/hash、内容/类型/重要度/到期及当前 Evidence/Grant。完整遗忘穿透备份、产品主体 provision、替代/冲突审批及 UI 尚待实现。

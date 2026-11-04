@@ -19,6 +19,7 @@ import (
 // 000063 knowledge multi-tags, 000093 browser authorization, 000103 message
 // artifacts.
 var versionedSQLiteTables = []string{
+	"memory_publications", // 000053 durable host publication receipts
 	"memory_extraction_sessions",
 	"task_pending_ops",
 	"task_dead_letters",
@@ -89,7 +90,7 @@ var versionedSQLiteColumns = map[string][]string{
 	}, // 000028
 }
 
-const expectedSQLiteMigrationVersion = 52
+const expectedSQLiteMigrationVersion = 53
 
 func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	repoRoot := sqliteRepoRoot(t)
