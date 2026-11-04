@@ -1,6 +1,7 @@
 package types
 
 type ExternalVectorRequest struct {
+	ItemIDs []string  `json:"item_ids,omitempty"`
 	ModelID string    `json:"model_id"`
 	ItemID  string    `json:"item_id,omitempty"`
 	Ticket  string    `json:"ticket,omitempty"`

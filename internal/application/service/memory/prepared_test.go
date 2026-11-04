@@ -75,3 +75,25 @@ func TestExternalVectorTicketScopeContentAndClearFencing(t *testing.T) {
 	require.NoError(t, err)
 	require.Error(t, svc.CommitVector(ctx, request))
 }
+
+func TestExternalVectorApprovalAllowlistBeforeRanking(t *testing.T) {
+	svc, tenants, _, _, _ := newExtractionHarness(t)
+	ctx := enabledCtx(t, tenants, 7, "alice")
+	tenants.set(7, &types.MemoryConfig{Enabled: true, HostInferenceOnly: true, EmbeddingModelID: "host", HostEmbeddingDimensions: 2})
+	item, err := svc.Remember(ctx, types.MemoryItem{Kind: types.MemoryKindFact, Content: "synthetic permitted memory", Importance: 3})
+	require.NoError(t, err)
+	plans, err := svc.PrepareVectors(ctx, types.ExternalVectorRequest{ModelID: "host"})
+	require.NoError(t, err)
+	require.NoError(t, svc.CommitVector(ctx, types.ExternalVectorRequest{ModelID: "host", ItemID: item.ID, Ticket: plans[0].Ticket, Vector: []float32{1, 0}}))
+	req := types.ExternalVectorRequest{ModelID: "host", Query: "synthetic", Limit: 5, Vector: []float32{1, 0}, ItemIDs: []string{}}
+	result, err := svc.SearchExternalVector(ctx, req)
+	require.NoError(t, err)
+	require.Empty(t, result.Items)
+	req.ItemIDs = []string{item.ID}
+	result, err = svc.SearchExternalVector(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	req.ItemIDs = []string{item.ID, item.ID}
+	_, err = svc.SearchExternalVector(ctx, req)
+	require.Error(t, err)
+}

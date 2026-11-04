@@ -61,3 +61,30 @@ func TestPublicationAtomicReceiptAndForget(t *testing.T) {
 	_, err = svc.PublishMemory(ctx, stale)
 	require.Error(t, err)
 }
+
+func TestForgetPublicationFencesLateCreateAndDeletesVector(t *testing.T) {
+	svc, db, tenants := newMemoryHarness(t)
+	require.NoError(t, db.AutoMigrate(&types.MemoryPublication{}))
+	ctx := enabledCtx(t, tenants, 1, "eraser")
+	tenants.configs[1].HostInferenceOnly = true
+	generation, err := svc.PublicationContext(ctx)
+	require.NoError(t, err)
+	req := types.MemoryPublicationRequest{Key: strings.Repeat("e", 64), PayloadHash: strings.Repeat("f", 64), Generation: generation, Kind: "fact", Content: "synthetic deletion test", Importance: 3, ExpiresAt: time.Now().Add(time.Hour)}
+	require.NoError(t, svc.ForgetPublication(ctx, req.Key, req.PayloadHash))
+	_, err = svc.PublishMemory(ctx, req)
+	require.Error(t, err)
+	req.Key = strings.Repeat("a", 64)
+	result, err := svc.PublishMemory(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, db.Create(&types.MemoryItemEmbedding{ItemID: result.Item.ID, TenantID: 1, SubjectID: result.Item.SubjectID, ModelID: "host", Dims: 2, Vector: types.EncodeEmbedding([]float32{1, 0})}).Error)
+	require.Error(t, svc.ForgetPublication(ctx, req.Key, strings.Repeat("0", 64)))
+	require.NoError(t, svc.ForgetPublication(ctx, req.Key, req.PayloadHash))
+	require.NoError(t, svc.ForgetPublication(ctx, req.Key, req.PayloadHash))
+	var count int64
+	require.NoError(t, db.Model(&types.MemoryItemEmbedding{}).Where("item_id = ?", result.Item.ID).Count(&count).Error)
+	require.Zero(t, count)
+	_, err = svc.PublishMemory(ctx, req)
+	require.Error(t, err)
+	foreign := enabledCtx(t, tenants, 2, "eraser")
+	require.NoError(t, svc.ForgetPublication(foreign, req.Key, req.PayloadHash))
+}

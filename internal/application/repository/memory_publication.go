@@ -89,3 +89,29 @@ func (r *memoryRepository) PublishMemory(ctx context.Context, scope interfaces.M
 	})
 	return result, err
 }
+
+// ForgetPublication commits a create fence even if a submitted publication has not arrived.
+// A late POST with this key can never recreate content. Item, embedding and fence share one subject transaction.
+func (r *memoryRepository) ForgetPublication(ctx context.Context, scope interfaces.MemoryScope, key, payloadHash string) error {
+	return r.withSubject(ctx, scope, func(tx *gorm.DB, _ *types.MemorySubject) error {
+		repo := &memoryRepository{db: tx}
+		receipt, err := repo.GetPublication(ctx, scope, key)
+		if err != nil {
+			return err
+		}
+		if receipt == nil {
+			receipt = &types.MemoryPublication{ID: publicationID(scope, key), TenantID: scope.TenantID, SubjectID: scope.SubjectID, Key: key, PayloadHash: payloadHash, RequestHash: "erased", ItemID: ""}
+			return tx.Create(receipt).Error
+		}
+		if receipt.PayloadHash != payloadHash {
+			return types.ErrMemoryConflict
+		}
+		if err = tx.Where("tenant_id = ? AND subject_id = ? AND item_id = ?", scope.TenantID, scope.SubjectID, receipt.ItemID).Delete(&types.MemoryItemEmbedding{}).Error; err != nil {
+			return err
+		}
+		if err = tx.Where("tenant_id = ? AND subject_id = ? AND id = ?", scope.TenantID, scope.SubjectID, receipt.ItemID).Delete(&types.MemoryItem{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&types.MemoryPublication{}).Where("id = ?", receipt.ID).Update("request_hash", "erased").Error
+	})
+}

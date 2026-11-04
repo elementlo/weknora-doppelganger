@@ -66,3 +66,32 @@ func (h *MemoryHandler) PublishMemory(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"success": true, "data": result})
 }
+
+func (h *MemoryHandler) ForgetPublication(c *gin.Context) {
+	svc, ok := h.memoryService.(interface {
+		ForgetPublication(context.Context, string, string) error
+	})
+	if !ok {
+		c.JSON(501, gin.H{"success": false})
+		return
+	}
+	var body struct {
+		PayloadHash string `json:"payload_hash"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1024))
+	decoder.DisallowUnknownFields()
+	var trailing interface{}
+	if err := decoder.Decode(&body); err != nil {
+		c.JSON(400, gin.H{"success": false})
+		return
+	}
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		c.JSON(400, gin.H{"success": false})
+		return
+	}
+	if err := svc.ForgetPublication(c.Request.Context(), c.Param("key"), body.PayloadHash); err != nil {
+		c.JSON(409, gin.H{"success": false})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": gin.H{"erased": true}})
+}

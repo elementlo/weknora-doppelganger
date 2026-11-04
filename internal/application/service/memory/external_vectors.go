@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +79,68 @@ func (s *Service) SearchExternalVector(ctx context.Context, request types.Extern
 	scope, cfg, ok := s.enabledScope(ctx)
 	if !ok || request.ModelID == "" || request.ModelID != cfg.EmbeddingModelID || !validExternalVector(request.Vector) || (cfg.HostEmbeddingDimensions > 0 && len(request.Vector) != cfg.HostEmbeddingDimensions) || strings.TrimSpace(request.Query) == "" || len([]rune(request.Query)) > 2000 || request.Limit < 1 || request.Limit > 20 {
 		return interfaces.MemorySearchResult{}, fmt.Errorf("invalid vector search")
+	}
+	// Product host supplies an approval allowlist before any content is ranked or returned.
+	// A non-nil empty list means no accessible memories; nil retains the diagnostic API.
+	if request.ItemIDs != nil {
+		if len(request.ItemIDs) > 200 {
+			return interfaces.MemorySearchResult{}, fmt.Errorf("allowlist capacity")
+		}
+		seen := map[string]bool{}
+		ids := []string{}
+		items := map[string]*types.MemoryItem{}
+		now := time.Now()
+		for _, id := range request.ItemIDs {
+			if id == "" || seen[id] {
+				return interfaces.MemorySearchResult{}, fmt.Errorf("invalid allowlist")
+			}
+			seen[id] = true
+			item, err := s.repo.GetItem(ctx, scope, id)
+			if err != nil {
+				return interfaces.MemorySearchResult{}, err
+			}
+			if item != nil && item.Status == types.MemoryStatusActive && (item.ExpiresAt == nil || item.ExpiresAt.After(now)) {
+				ids = append(ids, id)
+				items[id] = item
+			}
+		}
+		vectors, err := s.repo.ItemEmbeddings(ctx, scope, ids, request.ModelID)
+		if err != nil {
+			return interfaces.MemorySearchResult{}, err
+		}
+		type ranked struct {
+			item  *types.MemoryItem
+			score float64
+		}
+		rankedItems := []ranked{}
+		for _, id := range ids {
+			score := types.CosineSimilarity(request.Vector, vectors[id])
+			lexical := strings.Contains(strings.ToLower(items[id].Content), strings.ToLower(strings.TrimSpace(request.Query)))
+			if score >= minCosine || lexical {
+				if lexical {
+					score += 1
+				}
+				rankedItems = append(rankedItems, ranked{items[id], score})
+			}
+		}
+		sort.Slice(rankedItems, func(i, j int) bool {
+			if rankedItems[i].score == rankedItems[j].score {
+				return rankedItems[i].item.ID < rankedItems[j].item.ID
+			}
+			return rankedItems[i].score > rankedItems[j].score
+		})
+		result := interfaces.MemorySearchResult{Available: true, RankingMode: "host_allowlist_hybrid", Items: []*types.MemoryItem{}}
+		for _, item := range rankedItems {
+			if len(result.Items) >= request.Limit {
+				break
+			}
+			result.Items = append(result.Items, item.item)
+		}
+		current, _, enabled := s.enabledScope(ctx)
+		if !enabled || *current.Generation != *scope.Generation {
+			return interfaces.MemorySearchResult{}, fmt.Errorf("generation changed")
+		}
+		return result, nil
 	}
 	// Search uses the existing lexical/vector fusion and active/expiry filtering.
 	result := s.SearchMemory(context.WithValue(ctx, externalVectorKey{}, externalQueryVector{request.ModelID, request.Vector}), request.Query, request.Limit)

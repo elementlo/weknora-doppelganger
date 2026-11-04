@@ -17,6 +17,7 @@ func RegisterMemoryRoutes(r *gin.RouterGroup, memoryHandler *handler.MemoryHandl
 		memoryGroup.GET("/publications/context", memoryHandler.PublicationContext)
 		memoryGroup.GET("/publications/:key", memoryHandler.ReadPublication)
 		memoryGroup.POST("/publications", memoryHandler.PublishMemory)
+		memoryGroup.POST("/publications/:key/forget", memoryHandler.ForgetPublication)
 		memoryGroup.POST("/search", memoryHandler.SearchMemory)
 		memoryGroup.POST("/vectors/prepare", memoryHandler.PrepareMemoryVectors)
 		memoryGroup.POST("/vectors/commit", memoryHandler.CommitMemoryVector)

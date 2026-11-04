@@ -85,3 +85,24 @@ func (s *Service) PublishMemory(ctx context.Context, req types.MemoryPublication
 	s.rebuildBlock(ctx, scope)
 	return s.ReadPublication(ctx, req.Key)
 }
+
+func (s *Service) ForgetPublication(ctx context.Context, key, payloadHash string) error {
+	scope, err := ResolveScope(ctx)
+	if err != nil || !publicationHash.MatchString(key) || !publicationHash.MatchString(payloadHash) {
+		return fmt.Errorf("invalid publication")
+	}
+	if _, err = s.repo.EnsureSubject(ctx, scope); err != nil {
+		return err
+	}
+	repo, ok := s.repo.(interface {
+		ForgetPublication(context.Context, interfaces.MemoryScope, string, string) error
+	})
+	if !ok {
+		return fmt.Errorf("unsupported publication")
+	}
+	if err = repo.ForgetPublication(ctx, scope, key, payloadHash); err != nil {
+		return err
+	}
+	s.rebuildBlock(ctx, scope)
+	return nil
+}
