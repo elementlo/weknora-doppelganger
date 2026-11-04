@@ -181,7 +181,7 @@ func (r *memoryRepository) rankInProcess(
 		WHERE e.tenant_id = ? AND e.subject_id = ?
 		  AND e.model_id = ? AND e.dims = ?
 		  AND i.status = ?
-		  AND (i.expires_at IS NULL OR i.expires_at > ?)`
+		  AND (i.expires_at IS NULL OR ` + memoryExpirySQL(r.db, "i.expires_at", ">") + `)`
 	args := []interface{}{
 		scope.TenantID, scope.SubjectID,
 		query.ModelID, len(query.Vector), types.MemoryStatusActive, time.Now(),

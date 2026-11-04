@@ -47,3 +47,9 @@ On 2026-11-03 the service script was hardened to set the repository working dire
 SQLite 53 / PostgreSQL 137 新增 `memory_publications`。subject 事务同时创建记忆及 receipt，锁定 subject 并复核清除代次；相同 key 只允许完全相同请求。receipt 只保留 key/hash/item ID/时间，不保存候选正文，用户删除/clear 后仍保留，旧请求不能复活内容。每主体上限 10,000，不清理幂等收据腾位置。derived resident block 在事务后重建，失败不否认已提交事实；此接口不触发模型或自动 embedding。
 
 POST 失败可能已提交，宿主只 GET 对账；absent 不证明在途请求永不会提交。receipt 证明历史提交，不能证明当前条目仍可用，宿主还要核对 payload/hash、内容/类型/重要度/到期及当前 Evidence/Grant。完整遗忘穿透备份、产品主体 provision、替代/冲突审批及 UI 尚待实现。
+
+## SQLite 到期时间一致性（M03.9）
+
+显式发布使用 UTC expiry，服务本地时区可能是 +08。SQLite DATETIME 持有带 offset 的文本，直接 `expires_at > ?` 比较会按表面时钟排序，误过滤有效记忆或误保留已过期项。SQLite 的 active 读取、portable vector join 与 overdue 归档现统一用 `julianday` 比较时间点；PostgreSQL 保持原生 timestamp 比较，不改数据库内容和 schema。
+
+回归使用 -12 / +14 offset 检查未来项可读可召回、过去项不可读且仅归档过去项。真实独立数据库中，一小时有效的 UTC 发布记忆经 host embedding 后可被读取，宿主取消来源作业后仍须由领域批准过滤移除；修复时间比较不放宽授权、敏感或召回阈值。

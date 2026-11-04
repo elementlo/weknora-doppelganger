@@ -139,11 +139,19 @@ func (r *memoryRepository) GetItem(
 	return &item, nil
 }
 
-// notExpired excludes items whose usefulness has a stated end. Applying it in
-// the query rather than after the fact means an expired task cannot slip into
-// a prompt through a code path that forgot to filter.
+// memoryExpirySQL compares instants in SQLite DATETIME text, not wall clocks.
+// SQLite DATETIME values are text with offsets. Comparing their wall-clock
+// strings can expire a future UTC item against a local +08 query time.
+func memoryExpirySQL(db *gorm.DB, column, operator string) string {
+	if db.Dialector.Name() == "sqlite" {
+		return "julianday(" + column + ") " + operator + " julianday(?)"
+	}
+	return column + " " + operator + " ?"
+}
+
+// notExpired keeps expired facts out of every active memory read.
 func notExpired(query *gorm.DB) *gorm.DB {
-	return query.Where("expires_at IS NULL OR expires_at > ?", time.Now())
+	return query.Where("expires_at IS NULL OR "+memoryExpirySQL(query, "expires_at", ">"), time.Now())
 }
 
 func (r *memoryRepository) ListActiveByKinds(
@@ -488,7 +496,7 @@ func (r *memoryRepository) ExpireOverdue(
 		now := time.Now()
 		result := r.scoped(ctx, scope).
 			Model(&types.MemoryItem{}).
-			Where("status = ? AND expires_at IS NOT NULL AND expires_at <= ?", types.MemoryStatusActive, now).
+			Where("status = ? AND expires_at IS NOT NULL AND "+memoryExpirySQL(r.db, "expires_at", "<="), types.MemoryStatusActive, now).
 			Updates(map[string]interface{}{
 				"status":     types.MemoryStatusArchived,
 				"updated_at": now,
