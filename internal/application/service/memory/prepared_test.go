@@ -17,7 +17,7 @@ func TestPreparedExternalHasNoModelAndFencesContentSubjectKindAndClear(t *testin
 	plan, err := svc.PrepareExternal(ctx, req, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, plan.Prompt)
-	require.Equal(t, "complete", plan.ExistingCoverage)
+	require.Equal(t, "host_sources_only", plan.ExistingCoverage)
 	resolution := types.ExternalMemoryResolution{Sources: req.Sources, Ticket: plan.Ticket, Content: `{"memories":[{"action":"add","kind":"preference","content":"先结论","source":1,"importance":3}]}`}
 	result, err := svc.ResolveExternal(ctx, resolution, false)
 	require.NoError(t, err)
@@ -96,4 +96,16 @@ func TestExternalVectorApprovalAllowlistBeforeRanking(t *testing.T) {
 	req.ItemIDs = []string{item.ID, item.ID}
 	_, err = svc.SearchExternalVector(ctx, req)
 	require.Error(t, err)
+}
+
+func TestHostExtractionNeverIncludesSubjectWideNotes(t *testing.T) {
+	svc, tenants, _, _, _ := newExtractionHarness(t)
+	ctx := enabledCtx(t, tenants, 7, "scoped-host")
+	_, err := svc.Remember(ctx, types.MemoryItem{Kind: types.MemoryKindFact, Content: "FOREIGN_SCOPE_CANARY_8F12", Importance: 5})
+	require.NoError(t, err)
+	tenants.set(7, &types.MemoryConfig{Enabled: true, HostInferenceOnly: true})
+	plan, err := svc.PrepareExternal(ctx, types.ExternalMemoryInput{Sources: []types.ExternalMemorySource{{ID: "s", Revision: "1", Hash: strings.Repeat("a", 64), Role: "user", Content: "AUTHORIZED_CURRENT_SOURCE_51D"}}}, false)
+	require.NoError(t, err)
+	require.NotContains(t, plan.Prompt, "FOREIGN_SCOPE_CANARY_8F12")
+	require.Contains(t, plan.Prompt, "AUTHORIZED_CURRENT_SOURCE_51D")
 }

@@ -66,6 +66,17 @@ func (s *Service) PrepareExternal(ctx context.Context, request types.ExternalMem
 	if err != nil {
 		return nil, err
 	}
+	// The host principal can serve several product scopes. Without a host approval
+	// allowlist, subject-wide notes/topics are not authorized extraction context.
+	if cfg.HostInferenceOnly {
+		instructions := cfg.ExtractInstructions
+		if experience {
+			instructions += "\nOnly propose reusable task procedures supported by the supplied verified effects. Include applicability and failure limits. Do not infer user identity or personality."
+		}
+		expires := time.Now().Add(2 * time.Minute).UnixMilli()
+		return &types.ExternalMemoryPlan{Ticket: strconv.FormatInt(expires, 10) + "." + ticketMAC(scope, request.Sources, experience, expires), ExpiresAt: expires,
+			System: extractionSystemPrompt, Prompt: buildExtractionPrompt(segment, nil, nil, nil, instructions), Schema: json.RawMessage(extractionSchema), CompletionLimits: []int{extractBudgetTokens, extractBudgetRetryTokens}, ExistingCoverage: "host_sources_only"}, nil
+	}
 	// This boundary MUST be model-free, including hidden embedding selection.
 	// Existing context is the bounded importance prefix; disclose coverage.
 	existing, err := s.repo.ListActiveByKinds(ctx, scope, types.MemoryKinds, extractRelevantCandidates+1)
